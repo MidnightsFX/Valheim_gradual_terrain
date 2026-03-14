@@ -96,12 +96,16 @@ namespace GradualTerrain.modules {
                 __instance.m_hmap.WorldToVertex(radii, out int radii_x, out int raddi_y);
                 int circleRadii = Mathf.Abs(radii_x - cent_x);
 
+                TerrainComp terrainMod = __instance;
+
                 //float delta = (2 * Mathf.PI) / granularity;
                 for (int i = 0; i < granularity; i++) {
                     //float t = delta * i;
                     //int x = Mathf.RoundToInt(cent_x + Mathf.Cos(t) * circleRadii);
                     //int y = Mathf.RoundToInt(cent_y + Mathf.Sin(t) * circleRadii);
                     //int index = (y * rowLength) + x;
+                    terrainMod = __instance;
+
 
                     float angle = (float)i / granularity * Mathf.PI * 2;
                     int x = Mathf.RoundToInt(cent_x + Mathf.Cos(angle) * circleRadii);
@@ -111,10 +115,65 @@ namespace GradualTerrain.modules {
                     if (completedIndexes.Contains(index)) { continue; }
                     //Logger.LogDebug($"Checking Index: {index}");
                     // Skip invalid ranges
+
+
+                    // Each of the adjacent hmaps here will need point modifications to the x and/or y
+
                     if (index < 0 || index >= terrainArraySize) {
                         Logger.LogDebug($"Computed index outside of range {index}, y{y} x{x}");
-                        completedIndexes.Add(index);
-                        continue;
+                        if (y > rowLength) {
+                            // Up, forward
+                            if (x > rowLength && nearbyComps.ContainsKey(HmRelativePosition.DiagPosXY)) {
+                                Logger.LogDebug("Determined DiagPosXY Neighbor");
+                                terrainMod = nearbyComps[HmRelativePosition.DiagPosXY];
+                            }
+                            // Up, back
+                            else if (x < 0 && nearbyComps.ContainsKey(HmRelativePosition.DiagNegXPosY)) {
+                                Logger.LogDebug("Determined DiagNegXPosY Neighbor");
+                                terrainMod = nearbyComps[HmRelativePosition.DiagNegXPosY];
+                            } 
+                            // Up
+                            else if (x > 0 && x <= rowLength && nearbyComps.ContainsKey(HmRelativePosition.PosY)) {
+                                Logger.LogDebug("Determined PosY Neighbor");
+                                terrainMod = nearbyComps[HmRelativePosition.PosY];
+                                // 64 - (72 - 64) = 56
+                                // Transform the y from overzied to within range, but at the bottom of the range instead of the top
+                                y = rowLength - (y - rowLength);
+                            }
+                        } else if (y < 0) {
+                            // Down forward
+                            if (x > rowLength && nearbyComps.ContainsKey(HmRelativePosition.DiagPosXNegY)) {
+                                Logger.LogDebug("Determined DiagPosXNegY Neighbor");
+                                terrainMod = nearbyComps[HmRelativePosition.DiagPosXNegY];
+                            }
+                            // Down
+                            if (x > 0 && x <= rowLength && nearbyComps.ContainsKey(HmRelativePosition.NegY)) {
+                                Logger.LogDebug("Determined NegY Neighbor");
+                                terrainMod = nearbyComps[HmRelativePosition.NegY];
+                                // transform the Y to a valid range, x is already valid?
+                                y = y - rowLength;
+                            }
+                            // Down, back
+                            if (x < 0 && nearbyComps.ContainsKey(HmRelativePosition.DiagNegXY)) {
+                                Logger.LogDebug("Determined NegY Neighbor");
+                                terrainMod = nearbyComps[HmRelativePosition.DiagNegXY];
+                            }
+                        } else if (y > 0 && y < rowLength) {
+                            // Forward
+                            if (x > rowLength && nearbyComps.ContainsKey(HmRelativePosition.PosX)) {
+                                Logger.LogDebug("Determined PosX Neighbor");
+                                terrainMod = nearbyComps[HmRelativePosition.PosX];
+                            }
+
+                            //Backward
+                            if (x < 0 && nearbyComps.ContainsKey(HmRelativePosition.NegX)) {
+                                Logger.LogDebug("Determined NegX Neighbor");
+                                terrainMod = nearbyComps[HmRelativePosition.NegX];
+                            }
+                        }
+
+                        //completedIndexes.Add(index);
+                        //continue;
                     }
 
                     // TODO: consider if required?
@@ -130,8 +189,8 @@ namespace GradualTerrain.modules {
                         y = Mathf.Abs(x);
                     }
 
-                    float pointHeight = __instance.m_hmap.GetHeight(x, y);
-                    float pointOffset = __instance.m_levelDelta[index];
+                    float pointHeight = terrainMod.m_hmap.GetHeight(x, y);
+                    float pointOffset = terrainMod.m_levelDelta[index];
                     float pointTotalHeight = pointHeight + pointOffset;
                     float distanceToCenter = Vector2.Distance(centerVertex, new Vector2(x, y));
                     float allowedOffsetMine = (distanceToCenter * ValConfig.MaxAdjustmentMineSlope.Value);
@@ -140,7 +199,7 @@ namespace GradualTerrain.modules {
                     // Need to handle if the pointheight or total height is zero
                     // Need to address the center height being zero and resulting in the adjustment being massive in one direction or another
                     if (pointTotalHeight == 0) {
-                        Logger.LogDebug("Total height comparision was zero, is this the right h_map?");
+                        Logger.LogDebug($"Total height comparision was zero, is this the right h_map? x:{x} y:{y}");
                         completedIndexes.Add(index);
                         continue;
                     }
@@ -151,14 +210,14 @@ namespace GradualTerrain.modules {
                         // Calculate positive offset max and use that
                         float adjustment = Mathf.Abs(centerTotalHeight + allowedOffsetMine) - pointHeight;
                         // For for negative adjustments
-                        __instance.m_levelDelta[index] = Mathf.Clamp(adjustment, ValConfig.MinTerrainHeightAdjustment.Value, ValConfig.MaxTerrainHeightAdjustment.Value);
-                        __instance.m_modifiedHeight[index] = true;
+                        terrainMod.m_levelDelta[index] = Mathf.Clamp(adjustment, ValConfig.MinTerrainHeightAdjustment.Value, ValConfig.MaxTerrainHeightAdjustment.Value);
+                        terrainMod.m_modifiedHeight[index] = true;
                         Logger.LogDebug($"Adjusting: {pointTotalHeight}({pointOffset}) > ({centerTotalHeight}({centerOffset}) + {allowedOffsetMine}) setting adjustment: {adjustment} new total: {pointHeight + adjustment}");
                     } else if (pointTotalHeight < (centerTotalHeight - allowedOffsetHill)) {
                         float adjustment = Mathf.Abs(Mathf.Abs(centerTotalHeight - allowedOffsetHill) - pointHeight);
                         // For for negative adjustments
-                        __instance.m_levelDelta[index] = Mathf.Clamp(adjustment, ValConfig.MinTerrainHeightAdjustment.Value, ValConfig.MaxTerrainHeightAdjustment.Value);
-                        __instance.m_modifiedHeight[index] = true;
+                        terrainMod.m_levelDelta[index] = Mathf.Clamp(adjustment, ValConfig.MinTerrainHeightAdjustment.Value, ValConfig.MaxTerrainHeightAdjustment.Value);
+                        terrainMod.m_modifiedHeight[index] = true;
                         Logger.LogDebug($"Adjusting: {pointTotalHeight}({pointOffset}) < ({centerTotalHeight}({centerOffset}) + {allowedOffsetHill}) setting adjustment: {adjustment} new total: {pointHeight + adjustment}");
                     }
                     completedIndexes.Add(index);
@@ -222,7 +281,9 @@ namespace GradualTerrain.modules {
                             continue;
                         }
                     }
-
+                    if (!neighborTerrainComps.ContainsKey(HmRelativePosition.Center)) {
+                        neighborTerrainComps.Add(HmRelativePosition.Center, center);
+                    }
                 } else {
                     // Always ensure the center is available
                     neighborTerrainComps.Add(HmRelativePosition.Center, center);
