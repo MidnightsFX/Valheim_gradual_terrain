@@ -58,11 +58,15 @@ namespace GradualTerrain.modules {
                 }
                 __instance.m_lastOpRadius = modified_radius;
 
-                // Ensure terrain regenerates
-                __instance.m_lastOpPoint = worldPos;
-                __instance.m_lastOpRadius = modified_radius;
-                __instance.Save();
-                __instance.m_hmap.Poke(false);
+
+                foreach (TerrainComp comp in neighborComps.Values) {
+                    // Ensure terrain regenerates
+                    //comp.m_lastOpPoint = worldPos;
+                    comp.m_lastOpRadius = modified_radius;
+                    comp.Save();
+                    comp.m_hmap.Poke(false);
+                }
+                
                 if (ClutterSystem.instance) {
                     ClutterSystem.instance.ResetGrass(worldPos, modified_radius);
                 }
@@ -87,10 +91,10 @@ namespace GradualTerrain.modules {
                 float centerTotalHeight = centerHeight + centerOffset;
 
                 // Skip if the center is zero, we will always cause massive realignment with this
-                if (centerTotalHeight == 0) {
-                    Logger.LogDebug("Skipping due to center total height and offset being 0");
-                    return;
-                }
+                //if (centerTotalHeight == 0) {
+                //    Logger.LogDebug("Skipping due to center total height and offset being 0");
+                //    return;
+                //}
 
                 Vector3 radii = new Vector3(center.x + distance, center.y, center.z);
                 __instance.m_hmap.WorldToVertex(radii, out int radii_x, out int raddi_y);
@@ -118,76 +122,76 @@ namespace GradualTerrain.modules {
 
 
                     // Each of the adjacent hmaps here will need point modifications to the x and/or y
-
-                    if (index < 0 || index >= terrainArraySize) {
-                        Logger.LogDebug($"Computed index outside of range {index}, y{y} x{x}");
-                        if (y > rowLength) {
+                    // Which will allow us to correctly re-calculate the index for an adjacent heightmap
+                    if (y >= rowLength || x >= rowLength || x < 0 || y < 0) {
+                        Logger.LogDebug($"Computed index outside of range {index}, y{y} x{x} row {rowLength} nearby: {string.Join(",", nearbyComps.Keys)}");
+                        if (y < 0) {
                             // Up, forward
                             if (x > rowLength && nearbyComps.ContainsKey(HmRelativePosition.DiagPosXY)) {
-                                Logger.LogDebug("Determined DiagPosXY Neighbor");
                                 terrainMod = nearbyComps[HmRelativePosition.DiagPosXY];
+                                x = x - rowLength;
+                                y = y + rowLength;
+                                Logger.LogDebug($"Determined DiagPosXY Neighbor modified X{x} Y{y}");
                             }
                             // Up, back
                             else if (x < 0 && nearbyComps.ContainsKey(HmRelativePosition.DiagNegXPosY)) {
                                 Logger.LogDebug("Determined DiagNegXPosY Neighbor");
                                 terrainMod = nearbyComps[HmRelativePosition.DiagNegXPosY];
+                                x = x + rowLength;
+                                y = y + rowLength;
+                                Logger.LogDebug($"Determined DiagNegXPosY Neighbor modified X{x} Y{y}");
                             } 
                             // Up
                             else if (x > 0 && x <= rowLength && nearbyComps.ContainsKey(HmRelativePosition.PosY)) {
-                                Logger.LogDebug("Determined PosY Neighbor");
                                 terrainMod = nearbyComps[HmRelativePosition.PosY];
                                 // 64 - (72 - 64) = 56
                                 // Transform the y from overzied to within range, but at the bottom of the range instead of the top
-                                y = rowLength - (y - rowLength);
+                                // -1 -> 65 | 
+                                y = y + rowLength;
+                                Logger.LogDebug($"Determined PosY Neighbor modified X{x} Y{y}");
                             }
-                        } else if (y < 0) {
+                        } else if (y >= rowLength) {
                             // Down forward
                             if (x > rowLength && nearbyComps.ContainsKey(HmRelativePosition.DiagPosXNegY)) {
-                                Logger.LogDebug("Determined DiagPosXNegY Neighbor");
                                 terrainMod = nearbyComps[HmRelativePosition.DiagPosXNegY];
+                                x = x - rowLength;
+                                y = y - rowLength;
+                                Logger.LogDebug($"Determined DiagPosXNegY Neighbor modified X{x} Y{y}");
                             }
                             // Down
                             if (x > 0 && x <= rowLength && nearbyComps.ContainsKey(HmRelativePosition.NegY)) {
-                                Logger.LogDebug("Determined NegY Neighbor");
                                 terrainMod = nearbyComps[HmRelativePosition.NegY];
                                 // transform the Y to a valid range, x is already valid?
                                 y = y - rowLength;
+                                Logger.LogDebug($"Determined NegY Neighbor modified X{x} Y{y}");
                             }
                             // Down, back
                             if (x < 0 && nearbyComps.ContainsKey(HmRelativePosition.DiagNegXY)) {
-                                Logger.LogDebug("Determined NegY Neighbor");
                                 terrainMod = nearbyComps[HmRelativePosition.DiagNegXY];
+                                x = x + rowLength;
+                                y = y - rowLength;
+                                Logger.LogDebug($"Determined DiagNegXY Neighbor modified X{x} Y{y}");
                             }
                         } else if (y > 0 && y < rowLength) {
                             // Forward
                             if (x > rowLength && nearbyComps.ContainsKey(HmRelativePosition.PosX)) {
-                                Logger.LogDebug("Determined PosX Neighbor");
                                 terrainMod = nearbyComps[HmRelativePosition.PosX];
+                                x = x - rowLength;
+                                Logger.LogDebug($"Determined PosX Neighbor modified X{x} Y{y}");
                             }
-
                             //Backward
                             if (x < 0 && nearbyComps.ContainsKey(HmRelativePosition.NegX)) {
-                                Logger.LogDebug("Determined NegX Neighbor");
                                 terrainMod = nearbyComps[HmRelativePosition.NegX];
+                                x = x + rowLength;
+                                Logger.LogDebug($"Determined NegX Neighbor modified X{x} Y{y}");
                             }
                         }
-
+                        // if we are adjusting the X/Y, index must be modified too
+                        index = (y * rowLength) + x;
                         //completedIndexes.Add(index);
                         //continue;
                     }
 
-                    // TODO: consider if required?
-                    // Because this is a flat array, negative numbers actually indicate that we want to look on the other end of the array
-                    if (x < 0) {
-                        Logger.LogDebug($"Negative x:{x}");
-                        //x = rowLength + x;
-                        x = Mathf.Abs(x);
-                    }
-                    if (y < 0) {
-                        Logger.LogDebug($"Negative y:{y}");
-                        y = rowLength + y;
-                        y = Mathf.Abs(x);
-                    }
 
                     float pointHeight = terrainMod.m_hmap.GetHeight(x, y);
                     float pointOffset = terrainMod.m_levelDelta[index];
@@ -199,9 +203,9 @@ namespace GradualTerrain.modules {
                     // Need to handle if the pointheight or total height is zero
                     // Need to address the center height being zero and resulting in the adjustment being massive in one direction or another
                     if (pointTotalHeight == 0) {
-                        Logger.LogDebug($"Total height comparision was zero, is this the right h_map? x:{x} y:{y}");
-                        completedIndexes.Add(index);
-                        continue;
+                        Logger.LogDebug($"Total height comparision was zero, is this the right h_map? x:{x} y:{y} {index}");
+                        //completedIndexes.Add(index);
+                        //continue;
                     }
 
                     // Logger.LogDebug($"Compare {pointTotalHeight}({pointOffset}) < ({centerTotalHeight} - {allowedOffsetMine})");
@@ -249,44 +253,54 @@ namespace GradualTerrain.modules {
                         Logger.LogDebug($"Nearby Terrain comp directional offset: {relativePosition}");
                         if (relativePosition.x > 0 && relativePosition.z == 0) {
                             neighborTerrainComps.Add(HmRelativePosition.PosX, nearbyTcomp);
+                            Logger.LogDebug("PosX");
                             continue;
                         }
                         if (relativePosition.x < 0 && relativePosition.z == 0) {
                             neighborTerrainComps.Add(HmRelativePosition.NegX, nearbyTcomp);
+                            Logger.LogDebug("NegX");
                             continue;
                         }
                         if (relativePosition.x == 0 && relativePosition.z > 0) {
                             neighborTerrainComps.Add(HmRelativePosition.PosY, nearbyTcomp);
+                            Logger.LogDebug("PosY");
                             continue;
                         }
                         if (relativePosition.x == 0 && relativePosition.z < 0) {
                             neighborTerrainComps.Add(HmRelativePosition.NegY, nearbyTcomp);
+                            Logger.LogDebug("NegY");
                             continue;
                         }
                         // Diagonals
                         if (relativePosition.x > 0 && relativePosition.z > 0) {
                             neighborTerrainComps.Add(HmRelativePosition.DiagPosXY, nearbyTcomp);
+                            Logger.LogDebug("DiagPosXY");
                             continue;
                         }
                         if (relativePosition.x < 0 && relativePosition.z < 0) {
                             neighborTerrainComps.Add(HmRelativePosition.DiagNegXY, nearbyTcomp);
+                            Logger.LogDebug("DiagNegXY");
                             continue;
                         }
                         if (relativePosition.x > 0 && relativePosition.z < 0) {
                             neighborTerrainComps.Add(HmRelativePosition.DiagPosXNegY, nearbyTcomp);
+                            Logger.LogDebug("DiagPosXNegY");
                             continue;
                         }
                         if (relativePosition.x < 0 && relativePosition.z > 0) {
                             neighborTerrainComps.Add(HmRelativePosition.DiagNegXPosY, nearbyTcomp);
+                            Logger.LogDebug("DiagNegXPosY");
                             continue;
                         }
                     }
                     if (!neighborTerrainComps.ContainsKey(HmRelativePosition.Center)) {
                         neighborTerrainComps.Add(HmRelativePosition.Center, center);
+                        Logger.LogDebug("center");
                     }
                 } else {
                     // Always ensure the center is available
                     neighborTerrainComps.Add(HmRelativePosition.Center, center);
+                    Logger.LogDebug("center");
                 }
 
                 return neighborTerrainComps;
