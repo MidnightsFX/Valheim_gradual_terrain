@@ -1,5 +1,6 @@
 ﻿using BepInEx;
 using BepInEx.Logging;
+using GradualTerrain.modules;
 using HarmonyLib;
 using Jotunn.Entities;
 using Jotunn.Managers;
@@ -24,7 +25,6 @@ namespace GradualTerrain {
             cfg = new ValConfig(Config);
 
             Log.LogInfo("Breaking things down smoothly.");
-
             Assembly assembly = Assembly.GetExecutingAssembly();
             Harmony harmony = new(PluginGUID);
             harmony.PatchAll(assembly);

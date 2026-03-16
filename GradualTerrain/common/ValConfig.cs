@@ -13,10 +13,14 @@ namespace GradualTerrain {
         public static ConfigEntry<int> AdjustmentRange;
         public static ConfigEntry<float> MaxAdjustmentMineSlope;
         public static ConfigEntry<float> MaxAdjustmentHillSlope;
-        public static ConfigEntry<float> SmoothingPower;
-        public static ConfigEntry<float> TerrainRadiusStitchingModifier;
+        public static ConfigEntry<float> RingIncrements;
+        public static ConfigEntry<float> OffsetFromCenter;
         public static ConfigEntry<float> CircularGranularity;
-        public static ConfigEntry<float> OperationRadius; 
+        public static ConfigEntry<float> OperationRadius;
+        public static ConfigEntry<int> ChangesPerInterval;
+        public static ConfigEntry<float> TerrainSmoothingModifier;
+        public static ConfigEntry<float> TerrainSmoothingPower;
+        public static ConfigEntry<bool> PaintTerrainDuringChange;
 
         public ValConfig(ConfigFile cf) {
             // ensure all the config values are created
@@ -41,10 +45,14 @@ namespace GradualTerrain {
             AdjustmentRange = BindServerConfig("Gradual Digging", "AdjustmentRange", 30, "The range that gradual terrain modifications will be applied", false, 0, 200);
             MaxAdjustmentMineSlope = BindServerConfig("Gradual Digging", "MaxAdjustmentMineSlope", 1f, "The force that smoothing is applied outward from the target operation.");
             MaxAdjustmentHillSlope = BindServerConfig("Gradual Digging", "MaxAdjustmentHillSlope", 0.5f, "The force that smoothing is applied outward from the target operation.");
-            SmoothingPower = BindServerConfig("Gradual Digging", "SmoothingPower", 12f, "The smoothing power applied after digging", true, 1, 20);
+            RingIncrements = BindServerConfig("Gradual Digging", "RingIncrements", 12f, "The distance between each ring of terrain changes", true, 1, 20);
             CircularGranularity = BindServerConfig("Gradual Digging", "CircularGranularity", 6f, "The granularity used when building the circle");
             OperationRadius = BindServerConfig("Gradual Digging", "OperationRadius", 1.5f, "The radius to apply circular operations", true);
-            TerrainRadiusStitchingModifier = BindServerConfig("Gradual Digging", "TerrainRadiusStitchingModifier", 1f, "Modifier to how far out terrain repair happens", true);
+            OffsetFromCenter = BindServerConfig("Gradual Digging", "OffsetFromCenter", 1f, "Modifier for how far out to start the height modifications", true);
+            ChangesPerInterval = BindServerConfig("Gradual Digging", "ChangesPerInterval", 20, "The number of calculated points to operate on in a given second.");
+            TerrainSmoothingModifier = BindServerConfig("Gradual Digging", "TerrainSmoothingModifier", 2f, "Multiplier on the operation radius that influences how far out smoothing occurs", true);
+            TerrainSmoothingPower = BindServerConfig("Gradual Digging", "TerrainSmoothingPower", 3f, "The power of the smoothing effect", true);
+            PaintTerrainDuringChange = BindServerConfig("Gradual Digging", "PaintTerrainDuringChange", false, "Wether or not to modify the terrain texture to that of dug dirt/stone");
         }
 
         internal static void SetupMainFileWatcher() {
