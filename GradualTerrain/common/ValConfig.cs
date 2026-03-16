@@ -15,6 +15,8 @@ namespace GradualTerrain {
         public static ConfigEntry<float> MaxAdjustmentHillSlope;
         public static ConfigEntry<float> SmoothingPower;
         public static ConfigEntry<float> TerrainRadiusStitchingModifier;
+        public static ConfigEntry<float> CircularGranularity;
+        public static ConfigEntry<float> OperationRadius; 
 
         public ValConfig(ConfigFile cf) {
             // ensure all the config values are created
@@ -40,6 +42,8 @@ namespace GradualTerrain {
             MaxAdjustmentMineSlope = BindServerConfig("Gradual Digging", "MaxAdjustmentMineSlope", 1f, "The force that smoothing is applied outward from the target operation.");
             MaxAdjustmentHillSlope = BindServerConfig("Gradual Digging", "MaxAdjustmentHillSlope", 0.5f, "The force that smoothing is applied outward from the target operation.");
             SmoothingPower = BindServerConfig("Gradual Digging", "SmoothingPower", 12f, "The smoothing power applied after digging", true, 1, 20);
+            CircularGranularity = BindServerConfig("Gradual Digging", "CircularGranularity", 6f, "The granularity used when building the circle");
+            OperationRadius = BindServerConfig("Gradual Digging", "OperationRadius", 1.5f, "The radius to apply circular operations", true);
             TerrainRadiusStitchingModifier = BindServerConfig("Gradual Digging", "TerrainRadiusStitchingModifier", 1f, "Modifier to how far out terrain repair happens", true);
         }
 
