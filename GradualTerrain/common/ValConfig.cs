@@ -21,6 +21,9 @@ namespace GradualTerrain {
         public static ConfigEntry<float> TerrainSmoothingModifier;
         public static ConfigEntry<float> TerrainSmoothingPower;
         public static ConfigEntry<bool> PaintTerrainDuringChange;
+        public static ConfigEntry<bool> SmoothTerrainOnChange;
+        public static ConfigEntry<bool> AdjustmentSquare;
+        public static ConfigEntry<float> AdjustmentPower;
 
         public ValConfig(ConfigFile cf) {
             // ensure all the config values are created
@@ -42,6 +45,8 @@ namespace GradualTerrain {
             MaxTerrainHeightAdjustment = BindServerConfig("Terrain Height Adjustment", "MaxTerrainHeightAdjustment", 12f, "The height terrain can be raised compared to its original position (vanilla default 8).", false, 0, 60f);
             MinTerrainHeightAdjustment = BindServerConfig("Terrain Height Adjustment", "MinTerrainHeightAdjustment", -12f,"The depth terrain can be lowered to compared to its original position (vanilla default 8).", false, -60, 0f);
 
+            AdjustmentSquare = BindServerConfig("Gradual Digging", "AdjustmentSquare", false, "When enabled, adjustments are square");
+            AdjustmentPower = BindServerConfig("Gradual Digging", "AdjustmentPower", 0.5f, "The modification power applied to the dig");
             AdjustmentRange = BindServerConfig("Gradual Digging", "AdjustmentRange", 30, "The range that gradual terrain modifications will be applied", false, 0, 200);
             MaxAdjustmentMineSlope = BindServerConfig("Gradual Digging", "MaxAdjustmentMineSlope", 1f, "The force that smoothing is applied outward from the target operation.");
             MaxAdjustmentHillSlope = BindServerConfig("Gradual Digging", "MaxAdjustmentHillSlope", 0.5f, "The force that smoothing is applied outward from the target operation.");
@@ -53,6 +58,8 @@ namespace GradualTerrain {
             TerrainSmoothingModifier = BindServerConfig("Gradual Digging", "TerrainSmoothingModifier", 2f, "Multiplier on the operation radius that influences how far out smoothing occurs", true);
             TerrainSmoothingPower = BindServerConfig("Gradual Digging", "TerrainSmoothingPower", 3f, "The power of the smoothing effect", true);
             PaintTerrainDuringChange = BindServerConfig("Gradual Digging", "PaintTerrainDuringChange", false, "Wether or not to modify the terrain texture to that of dug dirt/stone");
+            SmoothTerrainOnChange = BindServerConfig("Gradual Digging", "SmoothTerrainOnChange", true, "Enables or disables smoothing after terrain changes are made");
+
         }
 
         internal static void SetupMainFileWatcher() {

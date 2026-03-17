@@ -27,42 +27,42 @@ namespace GradualTerrain.modules {
         }
 
 
-        [HarmonyPatch(typeof(TerrainComp))]
-        internal static class ModifySurroundingTerrainAsync {
-            [HarmonyPatch(nameof(TerrainComp.ApplyOperation))]
-            private static void Postfix(TerrainOp modifier) {
-                // Only run on raise/lowers
-                if (InOperation || modifier.m_settings.m_raise == false) { return; } // This could be too slow and we don't want to allow the player steeper digging
-                InOperation = true;
-                Vector3 worldPos = modifier.transform.position;
-                float radius = modifier.GetRadius();
-                float delta = modifier.m_settings.m_raiseDelta;
-                Heightmap.GetHeight(worldPos, out float centerHeight);
-                bool raiseTerrain = false;
-                if (delta > 0) { raiseTerrain = true; }
-                Dictionary<float, List<TerrainModificationDetail>> SmoothingTargets = PlotGradualPoints(worldPos, raiseTerrain, centerHeight, ValConfig.AdjustmentRange.Value, radius + ValConfig.OffsetFromCenter.Value, ValConfig.RingIncrements.Value);
+        //[HarmonyPatch(typeof(TerrainComp))]
+        //internal static class ModifySurroundingTerrainAsync {
+        //    [HarmonyPatch(nameof(TerrainComp.ApplyOperation))]
+        //    private static void Postfix(TerrainOp modifier) {
+        //        // Only run on raise/lowers
+        //        if (InOperation || modifier.m_settings.m_raise == false) { return; } // This could be too slow and we don't want to allow the player steeper digging
+        //        InOperation = true;
+        //        Vector3 worldPos = modifier.transform.position;
+        //        float radius = modifier.GetRadius();
+        //        float delta = modifier.m_settings.m_raiseDelta;
+        //        Heightmap.GetHeight(worldPos, out float centerHeight);
+        //        bool raiseTerrain = false;
+        //        if (delta > 0) { raiseTerrain = true; }
+        //        Dictionary<float, List<TerrainModificationDetail>> SmoothingTargets = PlotGradualPoints(worldPos, raiseTerrain, centerHeight, ValConfig.AdjustmentRange.Value, radius + ValConfig.OffsetFromCenter.Value, ValConfig.RingIncrements.Value);
 
-                Player.m_localPlayer.StartCoroutine(CheckAndApplyTerrainChanges(SmoothingTargets, worldPos, radius));
-                //List<Heightmap> list = new List<Heightmap>();
-                //Heightmap.FindHeightmap(worldPos, radius * ValConfig.AdjustmentRange.Value * 1.2f, list);
-                //// This block could be ran async, potentially as a queued list of operations to allow running fewer updates
-                //foreach (KeyValuePair<float, List<TerrainModificationDetail>> kvp in SmoothingTargets) {
-                //    foreach (TerrainModificationDetail detail in kvp.Value) {
-                //        foreach (Heightmap hmap in list) {
-                //            TerrainComp tcomp = hmap.GetAndCreateTerrainCompiler();
-                //            InvokeTerrainChanges(tcomp, detail.position, new TerrainOp.Settings() { 
-                //                m_raise = true,
-                //                m_raiseRadius = ValConfig.OperationRadius.Value,
-                //                m_raiseDelta = detail.targetDelta,
-                //                m_raisePower = 0.5f,
-                //                m_paintCleared = false
-                //            });
-                //        }
-                //    }
-                //}
+        //        Player.m_localPlayer.StartCoroutine(CheckAndApplyTerrainChanges(SmoothingTargets, worldPos, radius));
+        //        //List<Heightmap> list = new List<Heightmap>();
+        //        //Heightmap.FindHeightmap(worldPos, radius * ValConfig.AdjustmentRange.Value * 1.2f, list);
+        //        //// This block could be ran async, potentially as a queued list of operations to allow running fewer updates
+        //        //foreach (KeyValuePair<float, List<TerrainModificationDetail>> kvp in SmoothingTargets) {
+        //        //    foreach (TerrainModificationDetail detail in kvp.Value) {
+        //        //        foreach (Heightmap hmap in list) {
+        //        //            TerrainComp tcomp = hmap.GetAndCreateTerrainCompiler();
+        //        //            InvokeTerrainChanges(tcomp, detail.position, new TerrainOp.Settings() { 
+        //        //                m_raise = true,
+        //        //                m_raiseRadius = ValConfig.OperationRadius.Value,
+        //        //                m_raiseDelta = detail.targetDelta,
+        //        //                m_raisePower = 0.5f,
+        //        //                m_paintCleared = false
+        //        //            });
+        //        //        }
+        //        //    }
+        //        //}
 
-            }
-        }
+        //    }
+        //}
 
         internal static void InvokeTerrainChanges(TerrainComp __instance, Vector3 pos, TerrainOp.Settings settings) {
             ZPackage zPackage = new ZPackage();
@@ -91,15 +91,17 @@ namespace GradualTerrain.modules {
 
                         TerrainComp tcomp = hmap.GetAndCreateTerrainCompiler();
                         InvokeTerrainChanges(tcomp, detail.position, new TerrainOp.Settings() {
+                            m_square = ValConfig.AdjustmentSquare.Value,
                             m_raise = true,
                             m_raiseRadius = ValConfig.OperationRadius.Value,
                             m_raiseDelta = detail.targetDelta,
-                            m_raisePower = 0.5f,
+                            m_raisePower = ValConfig.AdjustmentPower.Value,
                             m_paintCleared = ValConfig.PaintTerrainDuringChange.Value,
                             m_paintRadius = ValConfig.OperationRadius.Value,
-                            m_smooth = true,
+                            m_smooth = ValConfig.SmoothTerrainOnChange.Value,
                             m_smoothRadius = ValConfig.OperationRadius.Value * ValConfig.TerrainSmoothingModifier.Value,
                             m_smoothPower = ValConfig.TerrainSmoothingPower.Value
+                            
                         });
                         // If we created the change, we already selected the right hmap, and can break out of this lower loop
                         break;

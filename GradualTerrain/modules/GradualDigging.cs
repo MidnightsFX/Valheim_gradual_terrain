@@ -11,6 +11,7 @@ using UnityEngine;
 using UnityEngine.Analytics;
 using UnityEngine.SocialPlatforms;
 using UnityEngine.UIElements;
+using static GradualTerrain.modules.GradualDigging;
 
 namespace GradualTerrain.modules {
     internal static class GradualDigging {
@@ -40,37 +41,44 @@ namespace GradualTerrain.modules {
             }
         }
 
+        internal class TerrainCompRange {
+            public List<Vector3> points { get; set; } = new List<Vector3>();
+            public HmRelativePosition position { get; set; }
+        }
+
         [HarmonyPatch(typeof(TerrainComp))]
         internal static class CheckAndModifySurroundingHeightMap {
-            //[HarmonyPatch(nameof(TerrainComp.RaiseTerrain))]
-            //private static void Postfix(TerrainComp __instance, Vector3 worldPos, float radius, float delta) {
+            [HarmonyPatch(nameof(TerrainComp.RaiseTerrain))]
+            private static void Postfix(TerrainComp __instance, Vector3 worldPos, float radius, float delta) {
 
-            //    Dictionary<HmRelativePosition, TerrainComp> neighborComps = GetNearbyTerrain(worldPos, ValConfig.AdjustmentRange.Value, __instance);
-            //    int r = 1;
-            //    while (r <= ValConfig.AdjustmentRange.Value) {
-            //        SmoothNearbyTerrain(__instance, worldPos, r, neighborComps);
-            //        r++;
-            //    }
+                Dictionary<HmRelativePosition, TerrainComp> neighborComps = GetNearbyTerrain(worldPos, ValConfig.AdjustmentRange.Value, __instance);
+                int r = 1;
+                while (r <= ValConfig.AdjustmentRange.Value) {
+                    SmoothNearbyTerrain(__instance, worldPos, r, neighborComps);
+                    r++;
+                }
 
-            //    float modified_radius = radius;
-            //    if (ValConfig.AdjustmentRange.Value > modified_radius) {
-            //        modified_radius = ValConfig.AdjustmentRange.Value * ValConfig.TerrainRadiusStitchingModifier.Value;
-            //    }
-            //    __instance.m_lastOpRadius = modified_radius;
+                float modified_radius = radius;
+                if (ValConfig.AdjustmentRange.Value > modified_radius) {
+                    modified_radius = ValConfig.AdjustmentRange.Value;
+                }
+                __instance.m_lastOpRadius = modified_radius;
 
 
-            //    foreach (TerrainComp comp in neighborComps.Values) {
-            //        // Ensure terrain regenerates
-            //        //comp.m_lastOpPoint = worldPos;
-            //        comp.m_lastOpRadius = modified_radius;
-            //        comp.Save();
-            //        comp.m_hmap.Poke(false);
-            //    }
-                
-            //    if (ClutterSystem.instance) {
-            //        ClutterSystem.instance.ResetGrass(worldPos, modified_radius);
-            //    }
-            //}
+                foreach (TerrainComp comp in neighborComps.Values) {
+                    // Ensure terrain regenerates
+                    //comp.m_lastOpPoint = worldPos;
+                    comp.m_lastOpRadius = modified_radius;
+                    comp.Save();
+                    comp.m_hmap.Poke(false);
+                }
+
+                if (ClutterSystem.instance) {
+                    ClutterSystem.instance.ResetGrass(worldPos, modified_radius);
+                }
+            }
+
+
 
             internal static void SmoothNearbyTerrain(TerrainComp __instance, Vector3 center, float distance, Dictionary<HmRelativePosition,TerrainComp> nearbyComps) {
                 int granularity = Mathf.RoundToInt(distance * ValConfig.CircularGranularity.Value); // number of vertices per ring default: 10
@@ -124,6 +132,8 @@ namespace GradualTerrain.modules {
                     // Each of the adjacent hmaps here will need point modifications to the x and/or y
                     // Which will allow us to correctly re-calculate the index for an adjacent heightmap
                     if (y >= rowLength || x >= rowLength || x < 0 || y < 0) {
+                        // Ignore invalid indexes for now
+                        continue;
                         Logger.LogDebug($"Computed index outside of range {index}, y{y} x{x} row {rowLength} nearby: {string.Join(",", nearbyComps.Keys)}");
                         if (y < 0) {
                             // Up, forward
@@ -229,9 +239,13 @@ namespace GradualTerrain.modules {
             }
 
             public static Dictionary<HmRelativePosition, TerrainComp> GetNearbyTerrain(Vector3 pos, float distance, TerrainComp center) {
+                Dictionary<TerrainComp, TerrainCompRange> neighborTerrainComps = new Dictionary<TerrainComp, TerrainCompRange>();
+                neighborTerrainComps.Add(center, new TerrainCompRange() { position = HmRelativePosition.Center });
+                // Calculate a ring at the max distance with a handful of points around it 6-7 points per quadrant
+                // Maximum distance of the modification,
                 List<TerrainComp> nearbyComps = new List<TerrainComp>();
                 foreach (TerrainComp s_instance in TerrainComp.s_instances) {
-                    float area = s_instance.m_size / 1.5f;
+                    float area = s_instance.m_size / 1.25f;
                     Vector3 position = s_instance.transform.position;
                     float distanceToInstance = Vector3XZDistance(pos, position);
                     Logger.LogDebug($"Tcomp Nearby: center: {pos} nearby: {position} | {distanceToInstance} < {area} + {distance}");
@@ -239,71 +253,72 @@ namespace GradualTerrain.modules {
                         nearbyComps.Add(s_instance);
                     }
                 }
+
+                Vector3 radii = new Vector3(pos.x + distance, pos.y, pos.z);
+                float circleRadii = Mathf.Abs(radii.x - pos.x);
+                float granularity = 1;
+
+                for (int i = 0; i < granularity; i++) {
+                    float angle = i / granularity * Mathf.PI * 2;
+                    float x = pos.x + Mathf.Cos(angle) * circleRadii;
+                    float z = pos.z + Mathf.Sin(angle) * circleRadii;
+
+                    Vector3 testpoint = new Vector3(x, 0, z);
+
+                    bool determined = false;
+                    foreach (TerrainComp tcomp in nearbyComps) {
+                        if (tcomp.m_hmap.IsPointInside(testpoint)) {
+                            HmRelativePosition position = HmRelativePosition.Center;
+
+                            if (neighborTerrainComps.ContainsKey(tcomp)) {
+                                neighborTerrainComps[tcomp].points.Add(testpoint);
+                            } else {
+                                neighborTerrainComps.Add(tcomp, new TerrainCompRange() { points = new List<Vector3>() { testpoint }, position = position });
+                            }
+                            // If we found the tcomp things are inside, then skip the others
+                            determined = true;
+                            break;
+                        }
+                    }
+                    if (determined == false) {
+                        Logger.LogWarning($"The position: {testpoint} was not in any of the available hmaps.");
+                    }
+                }
+
+
                 Logger.LogDebug($"Reviewed {TerrainComp.s_instances.Count} and found {nearbyComps.Count} nearby");
-                Dictionary<HmRelativePosition, TerrainComp> neighborTerrainComps = new Dictionary<HmRelativePosition, TerrainComp>();
                 if (nearbyComps.Count > 1) {
                     Logger.LogDebug($"Multiple terrain Compositions found nearby: {nearbyComps.Count}");
-                    foreach (TerrainComp nearbyTcomp in nearbyComps) {
-                        // Center is always the one that we start the operation from, typically will always have the most modifications needed on it
-                        if (nearbyTcomp == center) {
-                            neighborTerrainComps.Add(HmRelativePosition.Center, nearbyTcomp);
-                            continue;
-                        }
-                        Vector3 relativePosition = center.transform.position - nearbyTcomp.transform.position;
-                        Logger.LogDebug($"Nearby Terrain comp directional offset: {relativePosition}");
-                        if (relativePosition.x > 0 && relativePosition.z == 0) {
-                            neighborTerrainComps.Add(HmRelativePosition.PosX, nearbyTcomp);
-                            Logger.LogDebug("PosX");
-                            continue;
-                        }
-                        if (relativePosition.x < 0 && relativePosition.z == 0) {
-                            neighborTerrainComps.Add(HmRelativePosition.NegX, nearbyTcomp);
-                            Logger.LogDebug("NegX");
-                            continue;
-                        }
-                        if (relativePosition.x == 0 && relativePosition.z > 0) {
-                            neighborTerrainComps.Add(HmRelativePosition.PosY, nearbyTcomp);
-                            Logger.LogDebug("PosY");
-                            continue;
-                        }
-                        if (relativePosition.x == 0 && relativePosition.z < 0) {
-                            neighborTerrainComps.Add(HmRelativePosition.NegY, nearbyTcomp);
-                            Logger.LogDebug("NegY");
-                            continue;
-                        }
-                        // Diagonals
-                        if (relativePosition.x > 0 && relativePosition.z > 0) {
-                            neighborTerrainComps.Add(HmRelativePosition.DiagPosXY, nearbyTcomp);
-                            Logger.LogDebug("DiagPosXY");
-                            continue;
-                        }
-                        if (relativePosition.x < 0 && relativePosition.z < 0) {
-                            neighborTerrainComps.Add(HmRelativePosition.DiagNegXY, nearbyTcomp);
-                            Logger.LogDebug("DiagNegXY");
-                            continue;
-                        }
-                        if (relativePosition.x > 0 && relativePosition.z < 0) {
-                            neighborTerrainComps.Add(HmRelativePosition.DiagPosXNegY, nearbyTcomp);
-                            Logger.LogDebug("DiagPosXNegY");
-                            continue;
-                        }
-                        if (relativePosition.x < 0 && relativePosition.z > 0) {
-                            neighborTerrainComps.Add(HmRelativePosition.DiagNegXPosY, nearbyTcomp);
-                            Logger.LogDebug("DiagNegXPosY");
-                            continue;
+                    foreach (KeyValuePair<TerrainComp, TerrainCompRange> nearbyTcomp in neighborTerrainComps) {
+                        
+                        foreach (Vector3 ve3 in nearbyTcomp.Value.points) {
+
                         }
                     }
-                    if (!neighborTerrainComps.ContainsKey(HmRelativePosition.Center)) {
-                        neighborTerrainComps.Add(HmRelativePosition.Center, center);
-                        Logger.LogDebug("center");
-                    }
-                } else {
-                    // Always ensure the center is available
-                    neighborTerrainComps.Add(HmRelativePosition.Center, center);
-                    Logger.LogDebug("center");
                 }
 
                 return neighborTerrainComps;
+            }
+
+            internal static HmRelativePosition DetermineRelativePosition(float x, float y, int nearbyTerrainComps) {
+
+                HmRelativePosition result = HmRelativePosition.Center;
+                if (nearbyTerrainComps < 5) {
+                    if (x > 0 && y == 0) { result = HmRelativePosition.PosX; }
+                    if (x < 0 && y == 0) { result = HmRelativePosition.NegX; }
+                    if (x == 0 && y > 0) { result = HmRelativePosition.PosY; }
+                    if (x == 0 && y < 0) { result = HmRelativePosition.NegY; }
+                } else {
+                    Logger.LogWarning("Modification change includes more than 5 terrain maps");
+                }
+
+                // Diagonals
+                if (x > 0 && y > 0) { result = HmRelativePosition.DiagPosXY; }
+                if (x < 0 && y < 0) { result = HmRelativePosition.DiagNegXY; }
+                if (x > 0 && y < 0) { result = HmRelativePosition.DiagPosXNegY; }
+                if (x < 0 && y > 0) { result = HmRelativePosition.DiagNegXPosY; }
+                Logger.LogDebug($"Checking x{x} y{y} determined: {result}");
+                return result;
             }
 
             internal static float Vector3XZDistance(Vector3 center, Vector3 other) {
