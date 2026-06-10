@@ -1,14 +1,7 @@
-﻿# GradualTerrain
-Upon building for release, this README.md is copied into the `Package` folder for thunderstore packaging. Remember to also edit the manifest.json and supply your own mod icon.
+﻿# Gradual Terrain
 
-## Installation (manual)
+The goal of this mod is to help enforce terrain modifications which prevent frequent pits or earth walls which tend to be the optimal way to fortify a base or trap and kill a creature.
 
+Additionally, this mod provides configuration that allows you to control what that slope limitation is AND how high/low terrain modifications can go.
 
-## Features
-
-
-## Changelog
-
-
-## Known issues
-You can find the github at:
+## Diggy Diggy Hole

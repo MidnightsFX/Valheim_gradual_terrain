@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 
 namespace GradualTerrain.modules {
-    internal class HeightmapChanges {
+    internal class HeightmapPatches {
 
         [HarmonyPatch(typeof(TerrainComp))]
         internal static class TerrainCompositionPatches {
@@ -70,16 +70,39 @@ namespace GradualTerrain.modules {
                 return codeMatcher.Instructions();
             }
 
+            // Populate the per-operation limits once, before the (transpiled) method body runs, so
+            // the per-vertex clamp delegates below only read a static instead of doing a lookup.
+            [HarmonyPrefix]
+            [HarmonyPatch(nameof(TerrainComp.LevelTerrain))]
+            static void LevelTerrainPrefix(TerrainComp __instance) {
+                BiomeConfiguration.SetCurrentLimits(__instance.m_hmap);
+            }
+
+            [HarmonyPrefix]
+            [HarmonyPatch(nameof(TerrainComp.RaiseTerrain))]
+            static void RaiseTerrainPrefix(TerrainComp __instance) {
+                BiomeConfiguration.SetCurrentLimits(__instance.m_hmap);
+            }
+
+            // ApplyToHeightmap produces the FINAL rendered height for every vertex and runs on each
+            // tile independently. It must clamp to a tile-independent envelope, otherwise a vertex
+            // shared across a seam clamps to two different biome limits and the tiles stop lining up.
+            [HarmonyPrefix]
+            [HarmonyPatch(nameof(TerrainComp.ApplyToHeightmap))]
+            static void ApplyToHeightmapPrefix() {
+                BiomeConfiguration.SetEnvelopeLimits();
+            }
+
             internal static float MinTerrainAdjustNoNeg() {
-                return Mathf.Abs(ValConfig.MinTerrainHeightAdjustment.Value);
+                return Mathf.Abs(BiomeConfiguration.CurrentMin);
             }
 
             internal static float MinTerrainAdjust() {
-                return ValConfig.MinTerrainHeightAdjustment.Value;
+                return BiomeConfiguration.CurrentMin;
             }
 
             internal static float MaxTerrainAdjust() {
-                return ValConfig.MaxTerrainHeightAdjustment.Value;
+                return BiomeConfiguration.CurrentMax;
             }
 
         }
