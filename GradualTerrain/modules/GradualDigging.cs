@@ -5,13 +5,20 @@ using UnityEngine;
 namespace GradualTerrain.modules {
     internal static class GradualDigging {
 
-        [HarmonyPatch(typeof(TerrainComp))]
+        [HarmonyPatch(typeof(TerrainOp))]
         internal static class CheckAndModifySurroundingHeightMap {
-            [HarmonyPatch(nameof(TerrainComp.RaiseTerrain))]
-            private static void Postfix(TerrainComp __instance, Vector3 worldPos, float radius, float delta) {
+            [HarmonyPostfix]
+            [HarmonyPatch(nameof(TerrainOp.Awake))]
+            private static void Postfix(TerrainOp __instance) {
+                // Only react to raise/dig operations (mining/raising)
+                if (TerrainOp.m_forceDisableTerrainOps || !__instance.m_settings.m_raise) { return; }
+
                 // Setting adjustment range to 0 effectively disables digging modifications.
                 int range = ValConfig.AdjustmentRange.Value;
                 if (range <= 0) { return; }
+
+                Vector3 worldPos = __instance.transform.position;
+                float radius = __instance.m_settings.m_raiseRadius;
 
 
                 // The dig is applied to every comp its radius overlaps, so this Postfix can fire on a
@@ -50,7 +57,7 @@ namespace GradualTerrain.modules {
                 BiomeConfiguration.HeightLimits limits = BiomeConfiguration.GetHeightLimits(centerHmap);
 
 
-                Logger.LogInfo($"Starting gradual terrain change from {worldPos} at height {centerTotalHeight} with limits ->  max:{limits.Max} min:{limits.Min}");
+                Logger.LogDebug($"Starting gradual terrain change from {worldPos} at height {centerTotalHeight} with limits ->  max:{limits.Max} min:{limits.Min}");
 
                 List<Heightmap> reachable = new List<Heightmap>();
                 Heightmap.FindHeightmap(worldPos, range, reachable);
@@ -60,7 +67,7 @@ namespace GradualTerrain.modules {
                 }
 
                 float modified_radius = Mathf.Max(radius, range);
-                __instance.m_lastOpRadius = modified_radius;
+                centerComp.m_lastOpRadius = modified_radius;
                 foreach (TerrainComp comp in modifiedComps) {
                     comp.m_lastOpRadius = modified_radius;
                     comp.Save();
@@ -142,6 +149,12 @@ namespace GradualTerrain.modules {
                         //if (Mathf.Approximately(newDelta, currentDelta)) { continue; }
 
                         if (comp == null) {
+                            // Don't create a comp while this zone's own objects (including its terrain
+                            // comp) are still loading - otherwise we race the engine and instantiate a
+                            // duplicate, which it reports as "Found another terrain compiler in this area,
+                            // removing it". This happens for tiles near the edge of the loaded area as the
+                            // player moves. If the zone isn't ready, just don't extend the crater into it.
+                            if (ZoneSystem.instance == null || !ZoneSystem.instance.IsZoneLoaded(pos)) { return; }
                             comp = hmap.GetAndCreateTerrainCompiler();
                             if (comp == null || !comp.m_initialized) { return; }
                         }

@@ -49,21 +49,19 @@ namespace GradualTerrain {
                 new ConfigurationManagerAttributes { IsAdvanced = true }));
             EnableDebugMode.SettingChanged += Logger.enableDebugLogging;
 
-            MaxTerrainHeightAdjustment = BindServerConfig("Terrain Height Adjustment", "MaxTerrainHeightAdjustment", 12f, "The height terrain can be raised compared to its original position (vanilla default 8).", false, 0, 300f);
-            MinTerrainHeightAdjustment = BindServerConfig("Terrain Height Adjustment", "MinTerrainHeightAdjustment", -12f,"The depth terrain can be lowered to compared to its original position (vanilla default 8).", false, -300f, 0f);
-            EnableBiomeSpecificHeightAdjustments = BindServerConfig("Gradual Digging", "EnableBiomeSpecificHeightAdjustments", false, "Uses biome-specific configurations for height map adjustments. This allows for things such as, leveling mountains but not turning plains into an ocean.", advanced: true);
+            MaxTerrainHeightAdjustment = BindServerConfig("Terrain Height Adjustment", "MaxTerrainHeightAdjustment", 12f, "The height terrain can be raised compared to its original position (vanilla default 8).", false, 0, 2000f);
+            MinTerrainHeightAdjustment = BindServerConfig("Terrain Height Adjustment", "MinTerrainHeightAdjustment", -12f,"The depth terrain can be lowered to compared to its original position (vanilla default 8).", false, -2000f, 0f);
+            EnableBiomeSpecificHeightAdjustments = BindServerConfig("Gradual Digging", "EnableBiomeSpecificHeightAdjustments", true, "Uses biome-specific configurations for height map adjustments. This allows for things such as, leveling mountains but not turning plains into an ocean.", advanced: true);
             EnableBiomeSpecificHeightAdjustments.SettingChanged += (s, e) => modules.BiomeConfiguration.ClearCache();
             foreach(Heightmap.Biome biome in Enum.GetValues(typeof(Heightmap.Biome))) {
-                // None and All are not real corner biomes - skip them so we don't bind nonsense
-                // entries (e.g. "All-MinTerrainHeightAdjustment").
+                // None and All are not real biomes
                 if (biome == Heightmap.Biome.None || biome == Heightmap.Biome.All) { continue; }
 
-                // Item1 is the (positive) max, Item2 the (negative) min. The min needs a negative
-                // range or AcceptableValueRange clamps defaults like -50 up to 0.
+                // Item1 is the (positive) max, Item2 the (negative) min
                 Tuple<float, float> biome_value_default = GetBiomeDefaultHeightAdjustments(biome);
 
-                ConfigEntry<float> minEntry = BindServerConfig($"Terrain Height Adjustment Per Biome - {biome}", $"MinTerrainHeightAdjustment", biome_value_default.Item2, $"Minimum terrain height adjustment for {biome}.", advanced: true, valmin: -300f, valmax: 0f);
-                ConfigEntry<float> maxEntry = BindServerConfig($"Terrain Height Adjustment Per Biome - {biome}", $"MaxTerrainHeightAdjustment", biome_value_default.Item1, $"Maximum terrain height adjustment for {biome}.", advanced: true, valmin: 0f, valmax: 300f);
+                ConfigEntry<float> minEntry = BindServerConfig($"Terrain Height Adjustment Per Biome - {biome}", $"MinTerrainHeightAdjustment", biome_value_default.Item2, $"Minimum terrain height adjustment for {biome}.", advanced: true, valmin: -2000f, valmax: 0f);
+                ConfigEntry<float> maxEntry = BindServerConfig($"Terrain Height Adjustment Per Biome - {biome}", $"MaxTerrainHeightAdjustment", biome_value_default.Item1, $"Maximum terrain height adjustment for {biome}.", advanced: true, valmin: 0f, valmax: 2000f);
 
                 minEntry.SettingChanged += (s, e) => modules.BiomeConfiguration.ClearCache();
                 maxEntry.SettingChanged += (s, e) => modules.BiomeConfiguration.ClearCache();
@@ -74,7 +72,7 @@ namespace GradualTerrain {
 
 
 
-            AdjustmentRange = BindServerConfig("Gradual Digging", "AdjustmentRange", 60, "The range that gradual terrain modifications will be applied", false, 0, 200);
+            AdjustmentRange = BindServerConfig("Gradual Digging", "AdjustmentRange", 60, "The range that gradual terrain modifications will be applied", false, 0, 100);
             MaxAdjustmentMineSlope = BindServerConfig("Gradual Digging", "MaxAdjustmentMineSlope", 0.50f, "The force that smoothing is applied outward from the target operation.");
             MaxAdjustmentHillSlope = BindServerConfig("Gradual Digging", "MaxAdjustmentHillSlope", 0.75f, "The force that smoothing is applied outward from the target operation.");
         }
@@ -101,9 +99,8 @@ namespace GradualTerrain {
                     heightAdjustments = new Tuple<float, float>(10f, -20f);
                     break;
 
-                case Heightmap.Biome.None:
-                case Heightmap.Biome.All:
-                    heightAdjustments = new Tuple<float, float>(8f, -8f);
+                case Heightmap.Biome.Ocean:
+                    heightAdjustments = new Tuple<float, float>(300f, -300f);
                     break;
 
                 default:

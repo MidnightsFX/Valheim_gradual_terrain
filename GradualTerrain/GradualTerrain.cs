@@ -14,7 +14,7 @@ namespace GradualTerrain {
     internal class GradualTerrain : BaseUnityPlugin {
         public const string PluginGUID = "MidnightsFX.GradualTerrain";
         public const string PluginName = "GradualTerrain";
-        public const string PluginVersion = "0.0.1";
+        public const string PluginVersion = "1.0.0";
 
         internal static ManualLogSource Log;
         internal ValConfig cfg;

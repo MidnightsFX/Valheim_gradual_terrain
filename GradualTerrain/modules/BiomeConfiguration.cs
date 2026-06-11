@@ -46,15 +46,6 @@ namespace GradualTerrain.modules {
         // Widest limit across all biomes (plus the global) - a single tile-independent envelope.
         private static HeightLimits envelopeLimits;
 
-        /// <summary>
-        /// The final render clamp in TerrainComp.ApplyToHeightmap caps every vertex's height and is
-        /// re-applied each time a tile regenerates, so it MUST be identical on every tile. If it used
-        /// the per-tile biome limit, a vertex shared across a seam would clamp to two different heights
-        /// and the tiles would no longer line up (and a deep dig spreading into a shallower-limit tile
-        /// would snap up to that tile's limit). So ApplyToHeightmap uses this widest-across-all-biomes
-        /// envelope; the actual per-biome shaping is enforced where deltas are written (the dig clamps
-        /// and the gradual smoothing).
-        /// </summary>
         internal static void SetEnvelopeLimits() {
             HeightLimits limits = GetEnvelopeLimits();
             CurrentMin = limits.Min;
